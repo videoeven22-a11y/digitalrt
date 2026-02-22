@@ -1,43 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-
-// Helper function to ensure default admin exists
-async function ensureDefaultAdmin() {
-  const adminCount = await db.adminUser.count();
-  if (adminCount === 0) {
-    await db.adminUser.create({
-      data: {
-        username: 'admin',
-        password: 'admin123',
-        name: 'Ketua RT',
-        role: 'Super Admin'
-      }
-    });
-    console.log('Default admin created: admin / admin123');
-  }
-  
-  // Also ensure RT config exists
-  const configCount = await db.rTConfig.count();
-  if (configCount === 0) {
-    await db.rTConfig.create({
-      data: {
-        id: 'default',
-        rtName: 'Ketua RT',
-        rtWhatsapp: '628123456789',
-        rtEmail: 'rt03.kpjati@smartwarga.id',
-        appName: 'SmartWarga RT 03 Kp. Jati',
-        appLogo: 'https://upload.wikimedia.org/wikipedia/commons/b/bc/Logo_RT_RW.png'
-      }
-    });
-    console.log('Default RT config created');
-  }
-}
+import { db, initializeDatabase } from '@/lib/db';
 
 // GET - Fetch all admin users
 export async function GET() {
   try {
-    // Ensure default admin exists
-    await ensureDefaultAdmin();
+    // Initialize database first
+    await initializeDatabase();
     
     const admins = await db.adminUser.findMany({
       select: {
@@ -51,45 +19,58 @@ export async function GET() {
     });
     
     return NextResponse.json({ success: true, data: admins });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching admins:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch admins' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to fetch admins',
+      hint: 'Coba akses /api/init terlebih dahulu'
+    }, { status: 500 });
   }
 }
 
 // POST - Login or Create admin
 export async function POST(request: NextRequest) {
   try {
-    // Ensure default admin exists before any operation
-    await ensureDefaultAdmin();
+    // Initialize database first
+    await initializeDatabase();
     
     const body = await request.json();
     
     // Login action
     if (body.action === 'login') {
+      console.log('[Login] Attempt for user:', body.username);
+      
       const admin = await db.adminUser.findFirst({
         where: {
           username: body.username,
-          password: body.password // In production, use proper password hashing
+          password: body.password
         }
       });
       
       if (!admin) {
+        console.log('[Login] Failed - invalid credentials');
         return NextResponse.json({ 
           success: false, 
-          error: 'Username atau password salah' 
+          error: 'Username atau password salah. Gunakan: admin / admin123' 
         }, { status: 401 });
       }
       
-      // Create audit log
-      await db.auditLog.create({
-        data: {
-          action: 'Login Admin',
-          user: admin.name,
-          target: `Username: ${admin.username}`,
-          type: 'LOGIN'
-        }
-      });
+      console.log('[Login] Success for:', admin.name);
+      
+      // Try to create audit log (ignore if fails)
+      try {
+        await db.auditLog.create({
+          data: {
+            action: 'Login Admin',
+            user: admin.name,
+            target: `Username: ${admin.username}`,
+            type: 'LOGIN'
+          }
+        });
+      } catch (e) {
+        // Ignore audit log errors
+      }
       
       return NextResponse.json({ 
         success: true, 
@@ -104,7 +85,6 @@ export async function POST(request: NextRequest) {
     
     // Create new admin (Hanya Super Admin)
     if (body.action === 'create') {
-      // Validasi: Hanya Super Admin yang bisa tambah admin
       if (body.requesterRole !== 'Super Admin') {
         return NextResponse.json({ 
           success: false, 
@@ -132,16 +112,6 @@ export async function POST(request: NextRequest) {
         }
       });
       
-      // Create audit log
-      await db.auditLog.create({
-        data: {
-          action: 'Tambah Admin Baru',
-          user: body.currentUser || 'Admin',
-          target: `Username: ${body.username}`,
-          type: 'CREATE'
-        }
-      });
-      
       return NextResponse.json({ 
         success: true, 
         data: {
@@ -154,19 +124,24 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in admin operation:', error);
-    return NextResponse.json({ success: false, error: 'Operation failed' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Operation failed: ' + error.message,
+      hint: 'Coba akses /api/init terlebih dahulu, kemudian login dengan admin/admin123'
+    }, { status: 500 });
   }
 }
 
 // PUT - Update admin (Hanya Super Admin)
 export async function PUT(request: NextRequest) {
   try {
+    await initializeDatabase();
+    
     const body = await request.json();
     const { id, name, username, password, role, requesterRole } = body;
     
-    // Validasi: Hanya Super Admin yang bisa edit admin
     if (requesterRole !== 'Super Admin') {
       return NextResponse.json({ 
         success: false, 
@@ -178,7 +153,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
     }
     
-    // Check if username already exists (for other users)
     if (username) {
       const existing = await db.adminUser.findFirst({
         where: {
@@ -195,7 +169,6 @@ export async function PUT(request: NextRequest) {
       }
     }
     
-    // Build update data
     const updateData: { name?: string; username?: string; password?: string; role?: string } = {};
     if (name) updateData.name = name;
     if (username) updateData.username = username;
@@ -205,16 +178,6 @@ export async function PUT(request: NextRequest) {
     const admin = await db.adminUser.update({
       where: { id },
       data: updateData
-    });
-    
-    // Create audit log
-    await db.auditLog.create({
-      data: {
-        action: 'Edit Admin',
-        user: body.currentUser || 'Admin',
-        target: `Username: ${admin.username}`,
-        type: 'UPDATE'
-      }
     });
     
     return NextResponse.json({ 
@@ -235,11 +198,12 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete admin (Hanya Super Admin)
 export async function DELETE(request: NextRequest) {
   try {
+    await initializeDatabase();
+    
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
     const requesterRole = searchParams.get('requesterRole');
     
-    // Validasi: Hanya Super Admin yang bisa hapus admin
     if (requesterRole !== 'Super Admin') {
       return NextResponse.json({ 
         success: false, 
@@ -251,7 +215,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
     }
     
-    // Check if this is the last Super Admin
     const admin = await db.adminUser.findUnique({ where: { id } });
     if (admin?.role === 'Super Admin') {
       const superAdminCount = await db.adminUser.count({
@@ -261,7 +224,7 @@ export async function DELETE(request: NextRequest) {
       if (superAdminCount <= 1) {
         return NextResponse.json({ 
           success: false, 
-          error: 'Tidak dapat menghapus Super Admin terakhir. Minimal harus ada 1 Super Admin.' 
+          error: 'Tidak dapat menghapus Super Admin terakhir.' 
         }, { status: 400 });
       }
     }

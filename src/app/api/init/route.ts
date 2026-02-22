@@ -1,37 +1,30 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { db, initializeDatabase } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 
-const execAsync = promisify(exec);
-
-// Auto-initialize database with default admin and config
+// GET - Initialize database and create default admin
 export async function GET() {
+  console.log('[Init API] Starting database initialization...');
+  
   try {
-    console.log('[Init] Starting database initialization...');
+    // Try to initialize using Prisma
+    await initializeDatabase();
     
-    // Try to check if admin exists, if error, run db push first
-    let existingAdmin;
-    try {
-      existingAdmin = await db.adminUser.findFirst();
-    } catch (error: any) {
-      console.log('[Init] Database tables not found, need to create them');
-      // If table doesn't exist, we can't do much in serverless
-      // Just try to create admin anyway
-    }
+    // Verify admin exists
+    const admin = await db.adminUser.findFirst({
+      where: { username: 'admin' }
+    });
     
-    if (existingAdmin) {
-      console.log('[Init] Admin already exists:', existingAdmin.username);
+    if (admin) {
       return NextResponse.json({ 
         success: true, 
-        message: 'Database sudah terinisialisasi',
-        admin: { username: existingAdmin.username, name: existingAdmin.name }
+        message: '✅ Database siap! Login dengan: admin / admin123',
+        admin: { username: admin.username, name: admin.name }
       });
     }
     
-    // Create default admin user
-    console.log('[Init] Creating default admin...');
-    const admin = await db.adminUser.create({
+    // Create admin if not exists
+    const newAdmin = await db.adminUser.create({
       data: {
         username: 'admin',
         password: 'admin123',
@@ -39,37 +32,94 @@ export async function GET() {
         role: 'Super Admin'
       }
     });
-    console.log('[Init] Admin created:', admin.username);
     
-    // Create default RT config
-    let config;
+    return NextResponse.json({ 
+      success: true, 
+      message: '✅ Admin berhasil dibuat! Login dengan: admin / admin123',
+      admin: { username: newAdmin.username, name: newAdmin.name }
+    });
+    
+  } catch (error: any) {
+    console.error('[Init API] Error:', error);
+    
+    // Check if it's a "table doesn't exist" error
+    if (error.message?.includes('does not exist') || 
+        error.message?.includes('no such table') ||
+        error.code === 'P2021') {
+      
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Database tables belum dibuat',
+        solution: 'Pastikan build command menyertakan: prisma db push',
+        buildCommand: 'prisma generate && prisma db push --accept-data-loss && next build'
+      }, { status: 500 });
+    }
+    
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message 
+    }, { status: 500 });
+  }
+}
+
+// POST - Force reset/recreate
+export async function POST() {
+  console.log('[Init API] Force creating admin...');
+  
+  try {
+    // Try to create admin directly
+    let admin;
+    
     try {
-      config = await db.rTConfig.create({
+      admin = await db.adminUser.create({
+        data: {
+          username: 'admin',
+          password: 'admin123',
+          name: 'Pak RT',
+          role: 'Super Admin'
+        }
+      });
+      console.log('[Init API] Admin created');
+    } catch (createError: any) {
+      // If admin exists, find it
+      if (createError.code === 'P2002') {
+        admin = await db.adminUser.findFirst({
+          where: { username: 'admin' }
+        });
+        console.log('[Init API] Admin already exists');
+      } else {
+        throw createError;
+      }
+    }
+    
+    // Try to create RT config
+    try {
+      await db.rTConfig.create({
         data: {
           id: 'default',
           rtName: 'Pak RT',
           rtWhatsapp: '628123456789',
-          rtEmail: 'rt@smartwarga.id',
-          appName: 'SmartWarga RT',
+          rtEmail: 'rt03@smartwarga.id',
+          appName: 'SmartWarga RT 03',
           appLogo: ''
         }
       });
-      console.log('[Init] RT Config created');
     } catch (e) {
-      console.log('[Init] RT Config might already exist, skipping');
+      // Ignore if exists
     }
     
     return NextResponse.json({ 
       success: true, 
-      message: 'Database berhasil diinisialisasi! Login dengan admin/admin123',
-      admin: { username: admin.username, name: admin.name }
+      message: '✅ Database siap! Login dengan: admin / admin123',
+      admin: admin ? { username: admin.username, name: admin.name } : null
     });
+    
   } catch (error: any) {
-    console.error('[Init] Error:', error);
     return NextResponse.json({ 
       success: false, 
       error: error.message,
-      hint: 'Jika error tentang tabel tidak ada, pastikan database sudah di-migrate di build time.'
+      code: error.code,
+      solution: 'Jika error tentang tabel tidak ada, deploy ulang dengan build command yang benar'
     }, { status: 500 });
   }
 }
