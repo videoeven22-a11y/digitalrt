@@ -37,22 +37,22 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json();
     
-    // Login action
+    // Login action (tanpa password - cukup username)
     if (body.action === 'login') {
       console.log('[Login] Attempt for user:', body.username);
       
+      // Cari user berdasarkan username saja (tanpa password)
       const admin = await db.adminUser.findFirst({
         where: {
-          username: body.username,
-          password: body.password
+          username: body.username
         }
       });
       
       if (!admin) {
-        console.log('[Login] Failed - invalid credentials');
+        console.log('[Login] Failed - user not found');
         return NextResponse.json({ 
           success: false, 
-          error: 'Username atau password salah. Gunakan: admin / admin123' 
+          error: 'Username tidak ditemukan. Gunakan: admin' 
         }, { status: 401 });
       }
       

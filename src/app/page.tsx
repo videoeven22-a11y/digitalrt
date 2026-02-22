@@ -114,12 +114,12 @@ export default function SmartWargaApp() {
     }
   };
 
-  const handleLogin = async (username: string, password: string): Promise<boolean> => {
+  const handleLogin = async (username: string, _password?: string): Promise<boolean> => {
     try {
       const res = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'login', username, password })
+        body: JSON.stringify({ action: 'login', username })
       });
 
       const data = await res.json();

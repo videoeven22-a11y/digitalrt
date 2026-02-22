@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Lock, User, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
-import { AdminUser, RTConfig } from '@/lib/types';
+import { Shield, User, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
+import { RTConfig } from '@/lib/types';
 
 interface LoginPageProps {
   rtConfig: RTConfig;
@@ -11,7 +11,6 @@ interface LoginPageProps {
 
 const LoginPage: React.FC<LoginPageProps> = ({ rtConfig, onLogin }) => {
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [initStatus, setInitStatus] = useState<'checking' | 'ready' | 'error'>('checking');
@@ -42,10 +41,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ rtConfig, onLogin }) => {
     setIsLoading(true);
     setError('');
 
-    const success = await onLogin(username, password);
+    const success = await onLogin(username, '');
     
     if (!success) {
-      setError('Username atau password salah. Coba: admin/admin123');
+      setError('Username tidak ditemukan. Coba: admin');
     }
     
     setIsLoading(false);
@@ -105,20 +104,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ rtConfig, onLogin }) => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Kata Sandi</label>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
-                    <input 
-                      required
-                      type="password" 
-                      placeholder="••••••••"
-                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:bg-white outline-none transition-all"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
+                {/* Password field removed - login with username only */}
               </div>
 
               {error && (
@@ -151,9 +137,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ rtConfig, onLogin }) => {
           <div className="flex items-start gap-3">
             <AlertCircle size={18} className="text-blue-500 mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs font-bold text-blue-700">Kredensial Default:</p>
+              <p className="text-xs font-bold text-blue-700">Login Tanpa Password:</p>
               <p className="text-xs text-blue-600 mt-1">Username: <code className="bg-blue-100 px-1.5 py-0.5 rounded">admin</code></p>
-              <p className="text-xs text-blue-600">Password: <code className="bg-blue-100 px-1.5 py-0.5 rounded">admin123</code></p>
+              <p className="text-xs text-blue-600">(Kosongkan password, cukup masukkan username)</p>
             </div>
           </div>
         </div>
