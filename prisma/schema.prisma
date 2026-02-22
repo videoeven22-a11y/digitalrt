@@ -1,0 +1,150 @@
+// SmartWarga RT 05 - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Status Warga
+enum ResidentStatus {
+  AKTIF
+  PINDAH
+  MENINGGAL
+}
+
+// Data Warga
+model Resident {
+  id            String   @id @default(cuid())
+  nik           String   @unique
+  noKk          String
+  name          String
+  pob           String   // Place of birth
+  dob           String   // Date of birth
+  gender        String   // Laki-laki / Perempuan
+  religion      String
+  occupation    String
+  bloodType     String
+  maritalStatus String
+  province      String
+  regency       String
+  district      String
+  village       String
+  address       String
+  
+  // Status Warga (Aktif/Pindah/Meninggal)
+  status        ResidentStatus @default(AKTIF)
+  statusDate    String?  // Tanggal pindah/meninggal
+  statusNote    String?  // Keterangan tambahan (alamat tujuan pindah, penyebab meninggal, dll)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Permohonan Surat
+model ServiceRequest {
+  id            String   @id @default(cuid())
+  nik           String
+  residentName  String
+  type          String   // Jenis surat
+  status        String   @default("Menunggu Verifikasi")
+  purpose       String?
+  address       String?
+  pobDob        String?
+  
+  // Detail tambahan (JSON string)
+  deathDetails  String?  // JSON: { date, dayPasaran, time, place, burialPlace }
+  nikahDetails  String?  // JSON: { brideStatus, fatherName, fatherNik, motherName, motherNik }
+  pindahDetails String?  // JSON: { addrAsal, addrTujuan, alasanPindah, klasifikasiPindah, familyMembers }
+  shtmDetails   String?  // JSON: { parentName, parentNik, parentPobDob, parentJob, parentAddress }
+  domisiliDetails String? // JSON: { nationality, durationStay }
+  
+  pdfUrl        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Admin User
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  password     String
+  name         String
+  role         String   // Super Admin / Sekretaris / Staf
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Audit Log
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  user      String
+  target    String
+  type      String   // CREATE / UPDATE / DELETE / APPROVE / REJECT
+  createdAt DateTime @default(now())
+}
+
+// Konfigurasi RT
+model RTConfig {
+  id          String   @id @default(cuid())
+  rtName      String
+  rtWhatsapp  String
+  rtEmail     String
+  appName     String
+  appLogo     String
+  updatedAt   DateTime @updatedAt
+}
+
+// Informasi Warga (Pengumuman, Jadwal, Link)
+model Information {
+  id          String   @id @default(cuid())
+  category    String   // pemerintah, jadwal, pengumuman, link
+  title       String
+  content     String   // Deskripsi atau konten
+  link        String?  // URL opsional untuk link eksternal
+  icon        String?  // Nama ikon lucide
+  color       String?  // Warna tema (emerald, blue, rose, dll)
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Konfigurasi Sinkronisasi Google Sheets
+model SyncConfig {
+  id              String   @id @default(cuid())
+  sheetUrl        String   // URL Google Spreadsheet
+  sheetId         String?  // Google Sheet ID (extracted from URL)
+  sheetName       String   @default("Sheet1") // Nama sheet/tab
+  apiKey          String?  // API Key (optional, for public sheets)
+  serviceAccount  String?  // Service Account JSON (for private sheets)
+  syncToken       String?  // Token untuk sinkronisasi (published sheet)
+  lastSyncAt      DateTime?
+  lastSyncStatus  String?  // success, failed, partial
+  lastSyncCount   Int      @default(0)
+  autoSync        Boolean  @default(false)
+  syncInterval    Int      @default(60) // dalam menit
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Log Sinkronisasi
+model SyncLog {
+  id            String   @id @default(cuid())
+  syncConfigId  String
+  direction     String   // push, pull, bidirectional
+  status        String   // success, failed, partial
+  message       String?
+  recordsPushed Int      @default(0)
+  recordsPulled Int      @default(0)
+  recordsUpdated Int     @default(0)
+  recordsFailed Int      @default(0)
+  details       String?  // JSON detail error/success
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+}
