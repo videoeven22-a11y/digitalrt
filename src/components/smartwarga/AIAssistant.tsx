@@ -24,7 +24,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ rtConfig }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: `Halo! Saya asisten digital ${rtConfig.appName}. Ada yang bisa saya bantu terkait layanan RT 03 Kp. Jati?` }
+    { role: 'model', text: `Halo! 👋 Saya SmartWarga AI, asisten digital ${rtConfig.appName || 'RT 03 Kp. Jati'}.\n\nSaya bisa membantu Anda:\n• 📄 Informasi layanan surat dan dokumen\n• 📋 Persyaratan dan prosedur administrasi\n• 🔍 Mencari informasi layanan publik terkini\n• ❓ Menjawab pertanyaan seputar kependudukan\n\nSilakan ketik pertanyaan Anda!` }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,7 +127,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ rtConfig }) => {
           <div className="relative">
             <input 
               type="text" 
-              placeholder="Tanyakan sesuatu..."
+              placeholder="Tanya syarat dokumen, prosedur layanan..."
               className="w-full pl-4 pr-12 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
               value={input}
               onChange={(e) => setInput(e.target.value)}

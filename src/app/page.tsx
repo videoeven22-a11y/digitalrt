@@ -299,20 +299,23 @@ export default function SmartWargaApp() {
         
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 space-y-6">
-          {activeTab === 'login' && !currentUser ? (
-            <LoginPage 
-              rtConfig={rtConfig}
-              onLogin={handleLogin}
-            />
-          ) : !currentUser ? (
-            // Dashboard publik untuk pengunjung/warga
-            <PublicDashboard 
-              rtConfig={rtConfig}
-              residents={residents}
-              requests={requests}
-              onLoginClick={() => setActiveTab('login')}
-              onOpenService={() => setIsServiceModalOpen(true)}
-            />
+          {!currentUser ? (
+            // Dashboard publik untuk pengunjung/warga (default)
+            activeTab === 'login' ? (
+              <LoginPage 
+                rtConfig={rtConfig}
+                onLogin={handleLogin}
+                onBack={() => setActiveTab('dashboard')}
+              />
+            ) : (
+              <PublicDashboard 
+                rtConfig={rtConfig}
+                residents={residents}
+                requests={requests}
+                onLoginClick={() => setActiveTab('login')}
+                onOpenService={() => setIsServiceModalOpen(true)}
+              />
+            )
           ) : (
             <>
               {activeTab === 'dashboard' && (

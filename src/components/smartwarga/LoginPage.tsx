@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Shield, User, Loader2, ArrowRight, AlertCircle, Lock, LogIn } from 'lucide-react';
+import { Shield, User, Loader2, ArrowRight, AlertCircle, Lock, LogIn, ArrowLeft } from 'lucide-react';
 import { RTConfig } from '@/lib/types';
 
 interface LoginPageProps {
   rtConfig: RTConfig;
   onLogin: (username: string, password: string) => Promise<boolean>;
+  onBack?: () => void;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ rtConfig, onLogin }) => {
+const LoginPage: React.FC<LoginPageProps> = ({ rtConfig, onLogin, onBack }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +32,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ rtConfig, onLogin }) => {
 
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center p-4 md:p-6 w-full">
+      {/* Back Button */}
+      {onBack && (
+        <button 
+          onClick={onBack}
+          className="self-start mb-4 flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Kembali ke Dashboard
+        </button>
+      )}
+      
       <div className="w-full max-w-[420px] space-y-6">
         {/* Logo dan Judul */}
         <div className="text-center space-y-3">

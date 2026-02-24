@@ -1,4 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
+import ZAI from 'z-ai-web-dev-sdk';
+
+// Initialize ZAI instance once
+let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
+
+async function getZAI() {
+  if (!zaiInstance) {
+    zaiInstance = await ZAI.create();
+  }
+  return zaiInstance;
+}
+
+// System prompt for SmartWarga assistant
+const getSystemPrompt = (rtName: string, rtWhatsapp: string) => `Kamu adalah asisten digital SmartWarga RT yang sangat membantu dan ramah. Kamu bekerja untuk RT 03 Kp. Jati.
+
+INFORMASI RT:
+- Nama RT: RT 03 Kp. Jati
+- Ketua RT: ${rtName || 'Ketua RT 03'}
+- WhatsApp RT: ${rtWhatsapp || '628123456789'}
+
+KEMAMPUAN KAMU:
+1. Kamu bisa mencari informasi dari internet untuk menjawab pertanyaan tentang layanan publik, administrasi kependudukan, dan layanan warga
+2. Kamu bisa memberikan informasi tentang prosedur pembuatan dokumen kependudukan
+3. Kamu bisa membantu warga memahami persyaratan dan alur layanan administrasi
+
+LAYANAN YANG TERSEDIA DI SMARTWARGA:
+1. Surat Keterangan Domisili
+2. Surat Keterangan Pindah
+3. Surat Izin Nikah (N1-N4)
+4. Surat Izin Keramaian
+5. Surat Kematian
+6. SKTM (Surat Keterangan Tidak Mampu)
+
+PANDUAN JAWABAN:
+- Jawab dengan bahasa Indonesia yang baik dan ramah
+- Berikan informasi yang akurat dan up-to-date
+- Jika tidak tahu pasti, katakan jujur dan sarankan untuk menghubungi Pak RT
+- Untuk pertanyaan tentang layanan publik atau administrasi, gunakan pencarian web untuk mendapatkan informasi terkini
+- Arahkan warga untuk menggunakan fitur "AJUKAN SURAT" di aplikasi untuk pengajuan surat
+- Berikan nomor WhatsApp RT jika warga butuh bantuan lebih lanjut
+
+CONTOH JAWABAN:
+- Untuk pertanyaan tentang syarat dokumen: jelaskan persyaratan dan prosedur
+- Untuk pertanyaan tentang jam layanan: jelaskan jam operasional
+- Untuk pertanyaan umum: berikan jawaban informatif dan membantu`;
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,51 +57,56 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Simple AI response logic for SmartWarga
-    const lowerMessage = message.toLowerCase();
-    let response = '';
+    const zai = await getZAI();
+    const systemPrompt = getSystemPrompt(rtName || 'Ketua RT 03', rtWhatsapp || '628123456789');
 
-    // Letter types
-    const letterTypes = [
-      'Surat Keterangan Pindah',
-      'Surat Izin Nikah (N1-N4)',
-      'Surat Izin Keramaian',
-      'Surat Kematian',
-      'SKTM (Surat Keterangan Tidak Mampu)',
-      'Surat Keterangan Domisili'
-    ];
+    // Check if we need to search the web for current information
+    const needsWebSearch = shouldSearchWeb(message);
+    let webContext = '';
 
-    if (lowerMessage.includes('surat') || lowerMessage.includes('dokumen') || lowerMessage.includes('layanan')) {
-      response = `📄 *Layanan Surat yang Tersedia:*\n\n${letterTypes.map((type, i) => `${i + 1}. ${type}`).join('\n')}\n\nUntuk mengajukan surat, klik tombol "AJUKAN SURAT" di sidebar atau menu utama. Prosesnya cepat dan mudah!`;
-    } 
-    else if (lowerMessage.includes('daftar') || lowerMessage.includes('pendaftaran') || lowerMessage.includes('warga baru')) {
-      response = `📝 *Pendaftaran Warga Baru*\n\nUntuk mendaftar sebagai warga RT 03 Kp. Jati, Anda perlu menyiapkan:\n• NIK (16 digit)\n• Nomor Kartu Keluarga (KK)\n• Nama Lengkap\n• Tempat & Tanggal Lahir\n• Alamat Lengkap\n\nKlik tombol "DAFTAR WARGA" di sidebar untuk memulai pendaftaran.`;
+    if (needsWebSearch) {
+      try {
+        // Search for relevant information
+        const searchQuery = getSearchQuery(message);
+        const searchResults = await zai.functions.invoke('web_search', {
+          query: searchQuery,
+          num: 5
+        });
+
+        if (Array.isArray(searchResults) && searchResults.length > 0) {
+          webContext = '\n\nINFORMASI DARI INTERNET:\n' + searchResults
+            .slice(0, 3)
+            .map((r: { name: string; snippet: string; url: string }) => 
+              `- ${r.name}: ${r.snippet}`
+            )
+            .join('\n');
+        }
+      } catch (searchError) {
+        console.log('Web search failed, continuing without web context');
+      }
     }
-    else if (lowerMessage.includes('kontak') || lowerMessage.includes('rt') || lowerMessage.includes('hubungi') || lowerMessage.includes('whatsapp') || lowerMessage.includes('wa')) {
-      response = `📞 *Kontak RT 03 Kp. Jati:*\n\n👨‍💼 Ketua RT: ${rtName || 'Ketua RT 03'}\n📱 WhatsApp: ${rtWhatsapp || '628123456789'}\n\nJangan ragu untuk menghubungi Ketua RT untuk keperluan mendesak atau konsultasi.`;
+
+    // Create chat completion with LLM
+    const completion = await zai.chat.completions.create({
+      messages: [
+        {
+          role: 'assistant',
+          content: systemPrompt + webContext
+        },
+        {
+          role: 'user',
+          content: message
+        }
+      ],
+      thinking: { type: 'disabled' }
+    });
+
+    const response = completion.choices[0]?.message?.content;
+
+    if (!response) {
+      throw new Error('No response from AI');
     }
-    else if (lowerMessage.includes('jam') || lowerMessage.includes('buka') || lowerMessage.includes('operasional')) {
-      response = `🕐 *Jam Operasional:*\n\nSistem SmartWarga dapat diakses 24 jam untuk:\n• Pendaftaran warga baru\n• Pengajuan surat online\n• Cek status pengajuan\n\nUntuk verifikasi dan pengambilan dokumen, silakan datang pada jam kerja atau hubungi Pak RT terlebih dahulu.`;
-    }
-    else if (lowerMessage.includes('persyaratan') || lowerMessage.includes('syarat')) {
-      response = `📋 *Persyaratan Umum Pengajuan Surat:*\n\n1. NIK aktif dan terdaftar\n2. Kartu Keluarga (KK)\n3. KTP Elektronik\n4. Surat pengantar dari RT/RW (jika diperlukan)\n\nSetiap jenis surat mungkin memiliki persyaratan tambahan. Sistem akan memandu Anda mengisi data yang diperlukan.`;
-    }
-    else if (lowerMessage.includes('sksm') || lowerMessage.includes('tidak mampu')) {
-      response = `📋 *SKTM (Surat Keterangan Tidak Mampu)*\n\nSKTM digunakan untuk:\n• Pengajuan beasiswa\n• Bantuan sosial\n• KIP Kuliah\n• Subsidi pemerintah\n\nDiperlukan data:\n• NIK dan KK orang tua/wali\n• Data siswa/anak\n• Alamat lengkap`;
-    }
-    else if (lowerMessage.includes('pindah') || lowerMessage.includes('mutasi')) {
-      response = `🏠 *Surat Keterangan Pindah*\n\nUntuk pindah alamat, diperlukan:\n• Data alamat asal lengkap\n• Data alamat tujuan\n• Daftar keluarga yang ikut pindah\n• Alasan perpindahan\n\nSistem akan generate formulir F-1.03 sesuai PERMENDAGRI.`;
-    }
-    else if (lowerMessage.includes('help') || lowerMessage.includes('bantu') || lowerMessage.includes('cara')) {
-      response = `🤖 *Bantuan SmartWarga AI*\n\nSaya bisa membantu Anda dengan:\n• ℹ️ Informasi layanan surat\n• 📝 Cara pendaftaran warga\n• 📞 Kontak RT\n• 📋 Persyaratan dokumen\n\nKetik pertanyaan Anda, atau gunakan kata kunci seperti: "surat", "daftar", "kontak RT", "persyaratan".`;
-    }
-    else if (lowerMessage.includes('halo') || lowerMessage.includes('hi') || lowerMessage.includes('hai')) {
-      response = `Halo! 👋\n\nSelamat datang di SmartWarga RT 03 Kp. Jati.\n\nSaya siap membantu Anda dengan informasi layanan RT 03 Kp. Jati. Silakan tanyakan apa yang Anda butuhkan!`;
-    }
-    else {
-      response = `Terima kasih atas pertanyaannya! 🙏\n\nSaya bisa membantu Anda dengan:\n• ℹ️ Jenis surat dan layanan\n• 📝 Cara pendaftaran warga\n• 📞 Kontak Pak RT\n• 📋 Persyaratan dokumen\n\nSilakan ketik pertanyaan lebih spesifik atau gunakan kata kunci seperti "surat", "daftar", atau "kontak".`;
-    }
-    
+
     return NextResponse.json({ 
       success: true, 
       data: { text: response } 
@@ -65,7 +115,28 @@ export async function POST(request: NextRequest) {
     console.error('Error in AI chat:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Maaf, layanan asisten sedang sibuk. Silakan coba lagi nanti.' 
+      error: 'Maaf, layanan asisten sedang sibuk. Silakan coba lagi nanti atau hubungi Pak RT langsung di WhatsApp.' 
     }, { status: 500 });
   }
+}
+
+// Determine if the message needs web search
+function shouldSearchWeb(message: string): boolean {
+  const keywords = [
+    'syarat', 'persyaratan', 'prosedur', 'cara', 'bagaimana', 'aturan',
+    'terbaru', 'update', 'terkini', 'informasi', 'berita',
+    'pemerintah', 'disdukcapil', 'kependudukan', 'ktp', 'kk',
+    'biaya', 'tarif', 'harga', 'waktu', 'lama',
+    'online', 'digital', 'website', 'aplikasi',
+    'hukum', 'undang', 'peraturan', 'kebijakan'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return keywords.some(keyword => lowerMessage.includes(keyword));
+}
+
+// Generate appropriate search query
+function getSearchQuery(message: string): string {
+  // Add context for Indonesian citizen services
+  return `layanan administrasi kependudukan Indonesia ${message}`;
 }
