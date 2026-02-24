@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: smartwarga-rt03
+    env: node
+    buildCommand: bun install && prisma generate && prisma db push --accept-data-loss && bun run build
+    startCommand: bun run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:/app/data/smartwarga.db
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1

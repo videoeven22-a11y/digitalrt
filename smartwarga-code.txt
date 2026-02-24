@@ -1,0 +1,375 @@
+================================================================================
+                    SMARTWARGA RT 03 - KODE LENGKAP
+================================================================================
+
+File ini berisi semua kode penting dari aplikasi SmartWarga.
+Copy paste ke project Next.js baru untuk menggunakan.
+
+================================================================================
+                              1. PRISMA SCHEMA
+================================================================================
+File: prisma/schema.prisma
+
+// SmartWarga RT 03 - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Status Warga
+enum ResidentStatus {
+  AKTIF
+  PINDAH
+  MENINGGAL
+}
+
+// Data Warga
+model Resident {
+  id            String   @id @default(cuid())
+  nik           String   @unique
+  noKk          String
+  name          String
+  pob           String   // Place of birth
+  dob           String   // Date of birth
+  gender        String   // Laki-laki / Perempuan
+  religion      String
+  occupation    String
+  bloodType     String
+  maritalStatus String
+  province      String
+  regency       String
+  district      String
+  village       String
+  address       String
+  
+  // Status Warga (Aktif/Pindah/Meninggal)
+  status        ResidentStatus @default(AKTIF)
+  statusDate    String?
+  statusNote    String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Permohonan Surat
+model ServiceRequest {
+  id            String   @id @default(cuid())
+  nik           String
+  residentName  String
+  type          String
+  status        String   @default("Menunggu Verifikasi")
+  purpose       String?
+  address       String?
+  pobDob        String?
+  
+  deathDetails  String?
+  nikahDetails  String?
+  pindahDetails String?
+  shtmDetails   String?
+  domisiliDetails String?
+  
+  pdfUrl        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Admin User
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  password     String
+  name         String
+  role         String   // Super Admin / Sekretaris / Staf
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Audit Log
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  user      String
+  target    String
+  type      String
+  createdAt DateTime @default(now())
+}
+
+// Konfigurasi RT
+model RTConfig {
+  id          String   @id @default(cuid())
+  rtName      String
+  rtWhatsapp  String
+  rtEmail     String
+  appName     String
+  appLogo     String
+  updatedAt   DateTime @updatedAt
+}
+
+// Informasi Warga
+model Information {
+  id          String   @id @default(cuid())
+  category    String
+  title       String
+  content     String
+  link        String?
+  icon        String?
+  color       String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+================================================================================
+                              2. TYPES
+================================================================================
+File: src/lib/types.ts
+
+export type AdminRole = 'Super Admin' | 'Sekretaris' | 'Staf';
+
+export interface AdminUser {
+  id: string;
+  username: string;
+  password?: string;
+  name: string;
+  role: AdminRole;
+  createdAt?: string;
+}
+
+export interface Resident {
+  nik: string;
+  noKk: string;
+  name: string;
+  pob: string;
+  dob: string;
+  gender: string;
+  religion: string;
+  occupation: string;
+  bloodType: string;
+  maritalStatus: string;
+  province: string;
+  regency: string;
+  district: string;
+  village: string;
+  address: string;
+  status: string;
+  statusDate?: string;
+  statusNote?: string;
+  createdAt?: string;
+}
+
+export interface ServiceRequest {
+  id: string;
+  nik: string;
+  residentName: string;
+  type: string;
+  status: string;
+  purpose?: string;
+  address?: string;
+  pobDob?: string;
+  deathDetails?: string;
+  nikahDetails?: string;
+  pindahDetails?: string;
+  shtmDetails?: string;
+  domisiliDetails?: string;
+  pdfUrl?: string;
+  createdAt: string;
+}
+
+export interface RTConfig {
+  id: string;
+  rtName: string;
+  rtWhatsapp: string;
+  rtEmail: string;
+  appName: string;
+  appLogo: string;
+}
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  user: string;
+  target: string;
+  type: string;
+  createdAt: string;
+}
+
+export interface Information {
+  id: string;
+  category: string;
+  title: string;
+  content: string;
+  link?: string;
+  icon?: string;
+  color?: string;
+  order: number;
+  isActive: boolean;
+}
+
+================================================================================
+                              3. CONSTANTS
+================================================================================
+File: src/lib/constants.ts
+
+import { RTConfig } from './types';
+
+export const DEFAULT_RT_CONFIG: RTConfig = {
+  id: 'default',
+  rtName: 'Ketua RT',
+  rtWhatsapp: '628123456789',
+  rtEmail: 'rt03.kpjati@smartwarga.id',
+  appName: 'SmartWarga RT 03 Kp. Jati',
+  appLogo: 'https://upload.wikimedia.org/wikipedia/commons/b/bc/Logo_RT_RW.png'
+};
+
+export const MARITAL_STATUS_OPTIONS = [
+  'Lajang',
+  'Menikah', 
+  'Cerai Hidup',
+  'Cerai Mati'
+];
+
+export const RELIGION_OPTIONS = [
+  'Islam',
+  'Kristen Protestan',
+  'Kristen Katolik',
+  'Hindu',
+  'Buddha',
+  'Konghucu'
+];
+
+================================================================================
+                              4. DB CONNECTION
+================================================================================
+File: src/lib/db.ts
+
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const db = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+
+================================================================================
+                              5. ENV FILE
+================================================================================
+File: .env
+
+DATABASE_URL="file:./db/custom.db"
+
+================================================================================
+                              6. NEXT CONFIG
+================================================================================
+File: next.config.ts
+
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  reactStrictMode: false,
+  allowedDevOrigins: [
+    "localhost",
+    ".space.z.ai",
+  ],
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+        ],
+      },
+    ];
+  },
+};
+
+export default nextConfig;
+
+================================================================================
+                              7. PACKAGE.JSON SCRIPTS
+================================================================================
+
+{
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate"
+  }
+}
+
+================================================================================
+                          8. LOCATION SERVICE
+================================================================================
+File: src/services/locationService.ts
+
+const BASE_URL = 'https://www.emsifa.com/api-wilayah-indonesia/api';
+
+export async function fetchProvinces() {
+  const res = await fetch(`${BASE_URL}/provinces.json`);
+  return res.json();
+}
+
+export async function fetchRegencies(provinceId: string) {
+  const res = await fetch(`${BASE_URL}/regencies/${provinceId}.json`);
+  return res.json();
+}
+
+export async function fetchDistricts(regencyId: string) {
+  const res = await fetch(`${BASE_URL}/districts/${regencyId}.json`);
+  return res.json();
+}
+
+export async function fetchVillages(districtId: string) {
+  const res = await fetch(`${BASE_URL}/villages/${districtId}.json`);
+  return res.json();
+}
+
+================================================================================
+                      9. DEFAULT LOGIN
+================================================================================
+
+Username: admin
+Password: admin123
+
+================================================================================
+                      10. CARA INSTALL
+================================================================================
+
+1. Buat project Next.js baru:
+   npx create-next-app@latest smartwarga --typescript --tailwind --app
+
+2. Install dependencies:
+   cd smartwarga
+   npm install prisma @prisma/client jspdf lucide-react date-fns
+
+3. Setup Prisma:
+   npx prisma init --datasource-provider sqlite
+
+4. Copy schema ke prisma/schema.prisma
+
+5. Push database:
+   npx prisma db push
+
+6. Copy semua file ke folder masing-masing
+
+7. Jalankan:
+   npm run dev
+
+8. Buka http://localhost:3000
+
+================================================================================
+                           SELESAI
+================================================================================
