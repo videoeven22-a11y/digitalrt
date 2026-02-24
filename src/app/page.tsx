@@ -314,6 +314,7 @@ export default function SmartWargaApp() {
                 requests={requests}
                 onLoginClick={() => setActiveTab('login')}
                 onOpenService={() => setIsServiceModalOpen(true)}
+                onOpenRegister={() => setIsResidentModalOpen(true)}
               />
             )
           ) : (
@@ -395,16 +396,14 @@ export default function SmartWargaApp() {
       {/* AI Assistant - show for all users (public warga) */}
       <AIAssistant rtConfig={rtConfig} />
       
-      {/* Admin-only modals */}
-      {currentUser && (
-        <ResidentFormModal 
-          isOpen={isResidentModalOpen} 
-          onClose={() => { setIsResidentModalOpen(false); setEditingResident(null); }} 
-          onSave={handleSaveResident} 
-          initialData={editingResident} 
-          isAdmin={true}
-        />
-      )}
+      {/* Resident Form Modal - show for both logged in and public users */}
+      <ResidentFormModal 
+        isOpen={isResidentModalOpen} 
+        onClose={() => { setIsResidentModalOpen(false); setEditingResident(null); }} 
+        onSave={handleSaveResident} 
+        initialData={editingResident} 
+        isAdmin={!!currentUser}
+      />
       
       {/* PWA Install Prompt */}
       <InstallPrompt />

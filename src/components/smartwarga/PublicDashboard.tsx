@@ -14,9 +14,10 @@ interface PublicDashboardProps {
   requests: ServiceRequest[];
   onLoginClick: () => void;
   onOpenService?: (type?: string) => void;
+  onOpenRegister?: () => void;
 }
 
-export default function PublicDashboard({ rtConfig, residents, requests, onLoginClick, onOpenService }: PublicDashboardProps) {
+export default function PublicDashboard({ rtConfig, residents, requests, onLoginClick, onOpenService, onOpenRegister }: PublicDashboardProps) {
   const [informations, setInformations] = useState<Information[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLayananOpen, setIsLayananOpen] = useState(false);
@@ -153,6 +154,27 @@ export default function PublicDashboard({ rtConfig, residents, requests, onLogin
           <ChevronRight className="w-8 h-8 text-white/60" />
         </div>
       </button>
+
+      {/* Tombol Daftar Warga */}
+      {onOpenRegister && (
+        <button
+          onClick={onOpenRegister}
+          className="w-full p-5 bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl text-white shadow-xl hover:shadow-2xl transition-all hover:scale-[1.01] active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <Users className="w-7 h-7" />
+              </div>
+              <div className="text-left">
+                <h2 className="text-lg font-bold">Daftar Warga Baru</h2>
+                <p className="text-emerald-100 text-sm">Daftarkan data kependudukan Anda</p>
+              </div>
+            </div>
+            <ChevronRight className="w-6 h-6 text-white/60" />
+          </div>
+        </button>
+      )}
 
       {/* Pengumuman Section - Always show */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
